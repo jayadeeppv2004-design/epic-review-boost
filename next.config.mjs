@@ -4,6 +4,11 @@ const nextConfig = {
   experimental: {
     // sharp + prisma are native deps; keep them external to the server bundle
     serverComponentsExternalPackages: ["sharp", "@prisma/client"],
+    // Ensure the embedded poster fonts ship in the serverless function bundle
+    // (they are read at runtime by src/lib/poster.ts).
+    outputFileTracingIncludes: {
+      "/api/qr/[code]": ["./src/assets/fonts/**"],
+    },
   },
 };
 
