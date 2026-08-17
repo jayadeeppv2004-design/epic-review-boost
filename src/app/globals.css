@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-neutral-50 text-neutral-900 antialiased;
+}
+
+/* Simple utility for cards */
+.card {
+  @apply rounded-xl border border-neutral-200 bg-white shadow-sm;
+}
+
+.btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-50;
+}
+.btn-primary {
+  @apply btn bg-toyota-red text-white hover:bg-red-700;
+}
+.btn-dark {
+  @apply btn bg-neutral-900 text-white hover:bg-neutral-700;
+}
+.btn-ghost {
+  @apply btn border border-neutral-300 bg-white text-neutral-800 hover:bg-neutral-100;
+}
+.btn-wa {
+  @apply btn bg-[#25D366] text-white hover:bg-[#1eb658];
+}
+.input {
+  @apply w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-toyota-red focus:ring-1 focus:ring-toyota-red;
+}
+.label {
+  @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-neutral-500;
+}

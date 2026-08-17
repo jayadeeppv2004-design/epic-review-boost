@@ -1,0 +1,92 @@
+// EPIC Review Boost — data model (mirrors PRD §6)
+// Backed by Supabase (PostgreSQL).
+//   DATABASE_URL — Supabase Transaction pooler (port 6543, pgbouncer) used by the app
+//   DIRECT_URL   — Supabase direct/session connection (port 5432) used for migrations
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Showroom {
+  id              String   @id @default(uuid())
+  name            String
+  googleReviewUrl String   @default("")
+  placeId         String   @default("")
+  createdAt       DateTime @default(now())
+
+  employees       Employee[]
+  scanEvents      ScanEvent[]
+  reviewSnapshots ReviewSnapshot[]
+
+  @@map("showrooms")
+}
+
+model Employee {
+  id           String   @id @default(uuid())
+  employeeId   String   @unique // official EPIC employee ID
+  employeeCode String   @unique // short slug used in /r/{code}
+  name         String
+  phone        String // E.164 incl. country code, for wa.me
+  showroomId   String
+  qrImageUrl   String   @default("")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  showroom    Showroom     @relation(fields: [showroomId], references: [id], onDelete: Cascade)
+  scanEvents  ScanEvent[]
+  messageLogs MessageLog[]
+
+  @@index([showroomId])
+  @@map("employees")
+}
+
+model ScanEvent {
+  id         String   @id @default(uuid())
+  employeeId String
+  showroomId String // denormalized for fast reporting
+  eventType  String // 'scan' | 'review_click'
+  userAgent  String   @default("")
+  ipHash     String   @default("") // hashed IP for de-dupe (privacy-safe)
+  createdAt  DateTime @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  showroom Showroom @relation(fields: [showroomId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@index([showroomId])
+  @@index([eventType])
+  @@index([createdAt])
+  @@map("scan_events")
+}
+
+model ReviewSnapshot {
+  id          String   @id @default(uuid())
+  showroomId  String
+  reviewCount Int
+  avgRating   Float?
+  recordedAt  DateTime @default(now())
+
+  showroom Showroom @relation(fields: [showroomId], references: [id], onDelete: Cascade)
+
+  @@index([showroomId])
+  @@map("review_snapshots")
+}
+
+model MessageLog {
+  id         String   @id @default(uuid())
+  employeeId String
+  type       String // 'qr' | 'report' | 'broadcast'
+  sentBy     String   @default("admin")
+  sentAt     DateTime @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@map("message_log")
+}
