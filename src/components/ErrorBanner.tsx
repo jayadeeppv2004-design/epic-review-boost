@@ -20,6 +20,12 @@ export default function ErrorBanner({ failure }: { failure: ApiFailure }) {
         )}
       </div>
       {failure.hint && <p className="mt-1 text-red-700">{failure.hint}</p>}
+      {failure.detail && (
+        <p className="mt-2 break-words font-mono text-xs text-red-600">
+          {failure.errorName ? `${failure.errorName}: ` : ""}
+          {failure.detail}
+        </p>
+      )}
       <p className="mt-2 text-xs text-red-600">
         This is a server-side problem — the numbers below are not real. Check{" "}
         <a className="underline" href="/api/health/db">

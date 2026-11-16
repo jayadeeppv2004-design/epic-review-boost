@@ -30,30 +30,80 @@ function prismaCode(err: unknown): string | undefined {
   return code ?? errorCode;
 }
 
+/**
+ * Strip anything credential-shaped out of an error message.
+ *
+ * Prisma puts the whole connection string into some of its errors, so nothing
+ * derived from a message is safe until it has been through here.
+ */
+export function redactSecrets(message: string): string {
+  let out = message;
+
+  // Whole connection strings, wherever they appear.
+  out = out.replace(/postgres(ql)?:\/\/\S+/gi, "[connection-string-redacted]");
+  // Bare user:password@host pairs.
+  out = out.replace(/[\w.-]+:[^@\s/]+@[\w.-]+/g, "[credentials-redacted]");
+
+  // Belt and braces: never echo the configured host or password back, even if
+  // they reached the message in a shape the patterns above do not match.
+  for (const name of ["DATABASE_URL", "DIRECT_URL"]) {
+    const raw = process.env[name];
+    if (!raw) continue;
+    try {
+      const u = new URL(raw);
+      for (const secret of [u.password, u.username, u.hostname]) {
+        if (secret && secret.length > 3) out = out.split(secret).join("[redacted]");
+      }
+    } catch {
+      /* unparseable URL — the patterns above are all we have */
+    }
+  }
+
+  return out.slice(0, 400);
+}
+
 export interface DbFailure {
   error: string;
   code?: string;
   hint?: string;
+  errorName?: string;
+  detail?: string;
 }
 
 /**
  * Describe a thrown error for the client.
  *
- * Deliberately omits `err.message`: Prisma embeds the full connection string
- * (host, port, database user) in its initialization error messages, and this
- * app's dashboard renders API errors straight into the page. Only the stable
- * error code and a hand-written hint are exposed. The complete error is written
- * to the server log, where it is visible in Vercel → Logs.
+ * Returns the stable error code, a hand-written hint, the error's class name and
+ * a redacted one-line excerpt of the message. The raw message is never returned
+ * verbatim — Prisma embeds the full connection string in its initialization
+ * errors, and this app's dashboard renders API errors straight into the page.
+ * The complete error is written to the server log, where it is visible in
+ * Vercel → Logs.
  */
 export function describeDbFailure(err: unknown, context: string): DbFailure {
   console.error(`[${context}] database query failed:`, err);
+
   const code = prismaCode(err);
+  const errorName =
+    err && typeof err === "object" && typeof (err as Error).name === "string"
+      ? (err as Error).name
+      : undefined;
+  const rawMessage =
+    err && typeof err === "object" && typeof (err as Error).message === "string"
+      ? (err as Error).message
+      : String(err ?? "");
+
   return {
     error: code
       ? `Database error ${code}`
       : "The server could not read from the database.",
     code,
     hint: code ? HINTS[code] : undefined,
+    errorName,
+    // First non-empty line only; Prisma messages are long and multi-paragraph.
+    detail: redactSecrets(
+      rawMessage.split("\n").map((l) => l.trim()).filter(Boolean)[0] ?? ""
+    ),
   };
 }
 

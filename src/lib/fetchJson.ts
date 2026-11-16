@@ -2,6 +2,8 @@ export interface ApiFailure {
   error: string;
   code?: string;
   hint?: string;
+  errorName?: string;
+  detail?: string;
 }
 
 /**
@@ -41,6 +43,8 @@ export async function getJson<T>(
         error: body?.error || `Request failed (${res.status}).`,
         code: body?.code,
         hint: body?.hint,
+        errorName: body?.errorName,
+        detail: body?.detail,
       },
     };
   }
