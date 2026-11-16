@@ -2,14 +2,19 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { isAuthed } from "@/lib/auth";
 import { shortCode } from "@/lib/util";
+import { describeDbFailure } from "@/lib/apiError";
 
 export async function GET() {
   if (!isAuthed()) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  const employees = await prisma.employee.findMany({
-    include: { showroom: true },
-    orderBy: { createdAt: "desc" },
-  });
-  return NextResponse.json({ employees });
+  try {
+    const employees = await prisma.employee.findMany({
+      include: { showroom: true },
+      orderBy: { createdAt: "desc" },
+    });
+    return NextResponse.json({ employees });
+  } catch (err) {
+    return NextResponse.json(describeDbFailure(err, "GET /api/employees"), { status: 503 });
+  }
 }
 
 export async function POST(req: Request) {
@@ -24,19 +29,23 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
-  const showroom = await prisma.showroom.findUnique({ where: { id: showroomId } });
-  if (!showroom) return NextResponse.json({ error: "Invalid showroom" }, { status: 400 });
+  try {
+    const showroom = await prisma.showroom.findUnique({ where: { id: showroomId } });
+    if (!showroom) return NextResponse.json({ error: "Invalid showroom" }, { status: 400 });
 
-  const dupe = await prisma.employee.findUnique({ where: { employeeId } });
-  if (dupe) return NextResponse.json({ error: "Employee ID already exists" }, { status: 409 });
+    const dupe = await prisma.employee.findUnique({ where: { employeeId } });
+    if (dupe) return NextResponse.json({ error: "Employee ID already exists" }, { status: 409 });
 
-  // unique employeeCode (stable tracked-link slug)
-  let code = shortCode();
-  while (await prisma.employee.findUnique({ where: { employeeCode: code } })) code = shortCode();
+    // unique employeeCode (stable tracked-link slug)
+    let code = shortCode();
+    while (await prisma.employee.findUnique({ where: { employeeCode: code } })) code = shortCode();
 
-  const employee = await prisma.employee.create({
-    data: { name, phone, employeeId, showroomId, employeeCode: code },
-    include: { showroom: true },
-  });
-  return NextResponse.json({ employee }, { status: 201 });
+    const employee = await prisma.employee.create({
+      data: { name, phone, employeeId, showroomId, employeeCode: code },
+      include: { showroom: true },
+    });
+    return NextResponse.json({ employee }, { status: 201 });
+  } catch (err) {
+    return NextResponse.json(describeDbFailure(err, "POST /api/employees"), { status: 503 });
+  }
 }

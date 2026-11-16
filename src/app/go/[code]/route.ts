@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { logEvent } from "@/lib/track";
 import { clientIp } from "@/lib/util";
+import { describeDbFailure } from "@/lib/apiError";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,19 @@ export async function GET(
   { params }: { params: { code: string } }
 ) {
   const h = headers();
-  const result = await logEvent(params.code, "review_click", h, clientIp(h));
+
+  let result;
+  try {
+    result = await logEvent(params.code, "review_click", h, clientIp(h));
+  } catch (err) {
+    // A customer is standing at the counter with their phone out — give them a
+    // real status code and a logged error rather than an opaque blank 500.
+    const failure = describeDbFailure(err, "GET /go/[code]");
+    return NextResponse.json(
+      { error: "Review links are temporarily unavailable.", code: failure.code },
+      { status: 503 }
+    );
+  }
 
   if (!result) {
     return NextResponse.json({ error: "unknown code" }, { status: 404 });

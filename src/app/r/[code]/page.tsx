@@ -1,7 +1,8 @@
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import { logEvent } from "@/lib/track";
+import { logEvent, type LogResult } from "@/lib/track";
 import { clientIp } from "@/lib/util";
+import { describeDbFailure } from "@/lib/apiError";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,33 @@ export default async function TrackedRedirect({
   params: { code: string };
 }) {
   const h = headers();
-  const result = await logEvent(params.code, "scan", h, clientIp(h));
+
+  let result: LogResult | null;
+  try {
+    result = await logEvent(params.code, "scan", h, clientIp(h));
+  } catch (err) {
+    // The database is unreachable. This page is what a customer sees after
+    // scanning a QR code, so fail with a readable message instead of Next's
+    // blank 500 screen.
+    describeDbFailure(err, "GET /r/[code]");
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-neutral-900 px-6 text-center">
+        <div className="w-full max-w-sm">
+          <div className="mb-2 text-sm font-semibold uppercase tracking-widest text-toyota-red">
+            EPIC Toyota
+          </div>
+          <h1 className="text-2xl font-extrabold text-white">
+            We&apos;re having a technical problem
+          </h1>
+          <p className="mt-4 text-neutral-300">
+            Sorry — we can&apos;t open your review link right now. Please try again in a
+            few minutes.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (!result) notFound();
 
   return (
@@ -39,7 +66,7 @@ export default async function TrackedRedirect({
         </a>
 
         <p className="mt-6 text-xs text-neutral-500">
-          You’ll be taken directly to Google to post your review.
+          You&apos;ll be taken directly to Google to post your review.
         </p>
       </div>
     </div>

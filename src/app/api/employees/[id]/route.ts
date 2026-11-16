@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { isAuthed } from "@/lib/auth";
+import { describeDbFailure } from "@/lib/apiError";
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   if (!isAuthed()) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -11,16 +12,28 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if (typeof body.showroomId === "string") data.showroomId = body.showroomId;
   if (typeof body.isActive === "boolean") data.isActive = body.isActive;
 
-  const employee = await prisma.employee.update({
-    where: { id: params.id },
-    data,
-    include: { showroom: true },
-  });
-  return NextResponse.json({ employee });
+  try {
+    const employee = await prisma.employee.update({
+      where: { id: params.id },
+      data,
+      include: { showroom: true },
+    });
+    return NextResponse.json({ employee });
+  } catch (err) {
+    return NextResponse.json(describeDbFailure(err, "PATCH /api/employees/[id]"), {
+      status: 503,
+    });
+  }
 }
 
 export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
   if (!isAuthed()) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  await prisma.employee.delete({ where: { id: params.id } });
-  return NextResponse.json({ ok: true });
+  try {
+    await prisma.employee.delete({ where: { id: params.id } });
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    return NextResponse.json(describeDbFailure(err, "DELETE /api/employees/[id]"), {
+      status: 503,
+    });
+  }
 }

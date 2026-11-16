@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { waLink, reportMessage } from "@/lib/wa";
+import { getJson, type ApiFailure } from "@/lib/fetchJson";
+import ErrorBanner from "@/components/ErrorBanner";
 
 interface LeaderRow {
   id: string;
@@ -62,6 +64,7 @@ export default function OverviewPage() {
   const [range, setRange] = useState("all");
   const [leaderShowroom, setLeaderShowroom] = useState(""); // leaderboard-only filter
   const [stats, setStats] = useState<Stats | null>(null);
+  const [failure, setFailure] = useState<ApiFailure | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -69,8 +72,9 @@ export default function OverviewPage() {
     // so summary tiles and the showroom comparison stay global.
     const qs = new URLSearchParams();
     if (range !== "all") qs.set("range", range);
-    const res = await fetch(`/api/stats?${qs.toString()}`, { cache: "no-store" });
-    if (res.ok) setStats(await res.json());
+    const { data, failure: err } = await getJson<Stats>(`/api/stats?${qs.toString()}`);
+    if (data) setStats(data);
+    setFailure(err ?? null);
     setLoading(false);
   }, [range]);
 
@@ -89,6 +93,7 @@ export default function OverviewPage() {
 
   return (
     <div className="space-y-6">
+      {failure && <ErrorBanner failure={failure} />}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold">Campaign overview</h1>

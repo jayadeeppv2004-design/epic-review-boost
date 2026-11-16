@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { isAuthed } from "@/lib/auth";
+import { describeDbFailure } from "@/lib/apiError";
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   if (!isAuthed()) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -19,23 +20,35 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   }
   if (typeof body.name === "string") data.name = body.name.trim();
 
-  const showroom = await prisma.showroom.update({ where: { id: params.id }, data });
-  return NextResponse.json({ showroom });
+  try {
+    const showroom = await prisma.showroom.update({ where: { id: params.id }, data });
+    return NextResponse.json({ showroom });
+  } catch (err) {
+    return NextResponse.json(describeDbFailure(err, "PATCH /api/showrooms/[id]"), {
+      status: 503,
+    });
+  }
 }
 
 export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
   if (!isAuthed()) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  // Refuse to delete a showroom that still has employees, to avoid silently
-  // wiping staff + their scan history via the FK cascade.
-  const employees = await prisma.employee.count({ where: { showroomId: params.id } });
-  if (employees > 0) {
-    return NextResponse.json(
-      { error: `Move or remove its ${employees} employee(s) first.` },
-      { status: 409 }
-    );
-  }
+  try {
+    // Refuse to delete a showroom that still has employees, to avoid silently
+    // wiping staff + their scan history via the FK cascade.
+    const employees = await prisma.employee.count({ where: { showroomId: params.id } });
+    if (employees > 0) {
+      return NextResponse.json(
+        { error: `Move or remove its ${employees} employee(s) first.` },
+        { status: 409 }
+      );
+    }
 
-  await prisma.showroom.delete({ where: { id: params.id } });
-  return NextResponse.json({ ok: true });
+    await prisma.showroom.delete({ where: { id: params.id } });
+    return NextResponse.json({ ok: true });
+  } catch (err) {
+    return NextResponse.json(describeDbFailure(err, "DELETE /api/showrooms/[id]"), {
+      status: 503,
+    });
+  }
 }

@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { shareQrPng } from "@/lib/shareQr";
+import { getJson, type ApiFailure } from "@/lib/fetchJson";
+import ErrorBanner from "@/components/ErrorBanner";
 
 interface Showroom {
   id: string;
@@ -24,6 +26,7 @@ export default function EmployeesPage() {
   const [origin, setOrigin] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [failure, setFailure] = useState<ApiFailure | null>(null);
   const [filterShowroom, setFilterShowroom] = useState("");
   const [form, setForm] = useState({ name: "", employeeId: "", phone: "", showroomId: "" });
 
@@ -33,11 +36,12 @@ export default function EmployeesPage() {
 
   async function load() {
     const [er, sr] = await Promise.all([
-      fetch("/api/employees", { cache: "no-store" }),
-      fetch("/api/showrooms", { cache: "no-store" }),
+      getJson<{ employees: Employee[] }>("/api/employees"),
+      getJson<{ showrooms: Showroom[] }>("/api/showrooms"),
     ]);
-    if (er.ok) setEmployees((await er.json()).employees);
-    if (sr.ok) setShowrooms((await sr.json()).showrooms);
+    if (er.data) setEmployees(er.data.employees);
+    if (sr.data) setShowrooms(sr.data.showrooms);
+    setFailure(er.failure ?? sr.failure ?? null);
   }
 
   useEffect(() => {
@@ -82,6 +86,7 @@ export default function EmployeesPage() {
 
   return (
     <div className="space-y-6">
+      {failure && <ErrorBanner failure={failure} />}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-extrabold">Employees</h1>

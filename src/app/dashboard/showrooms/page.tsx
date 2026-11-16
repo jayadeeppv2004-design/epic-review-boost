@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { getJson, type ApiFailure } from "@/lib/fetchJson";
+import ErrorBanner from "@/components/ErrorBanner";
 
 interface Showroom {
   id: string;
@@ -14,11 +16,15 @@ export default function ShowroomsPage() {
   const [saved, setSaved] = useState<string>("");
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState("");
+  const [failure, setFailure] = useState<ApiFailure | null>(null);
   const [form, setForm] = useState({ name: "", placeId: "", googleReviewUrl: "" });
 
   async function load() {
-    const res = await fetch("/api/showrooms", { cache: "no-store" });
-    if (res.ok) setShowrooms((await res.json()).showrooms);
+    const { data, failure: err } = await getJson<{ showrooms: Showroom[] }>(
+      "/api/showrooms"
+    );
+    if (data) setShowrooms(data.showrooms);
+    setFailure(err ?? null);
   }
   useEffect(() => {
     load();
@@ -68,6 +74,7 @@ export default function ShowroomsPage() {
 
   return (
     <div className="space-y-6">
+      {failure && <ErrorBanner failure={failure} />}
       <div>
         <h1 className="text-2xl font-extrabold">Showrooms</h1>
         <p className="text-sm text-neutral-500">

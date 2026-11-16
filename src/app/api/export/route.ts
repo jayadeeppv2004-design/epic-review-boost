@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { isAuthed } from "@/lib/auth";
 import { computeStats } from "@/lib/stats";
+import { describeDbFailure } from "@/lib/apiError";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,12 @@ export async function GET(req: Request) {
   const range = url.searchParams.get("range") || "all";
   const showroomId = url.searchParams.get("showroomId") || "";
 
-  const stats = await computeStats({ range, showroomId });
+  let stats;
+  try {
+    stats = await computeStats({ range, showroomId });
+  } catch (err) {
+    return NextResponse.json(describeDbFailure(err, "GET /api/export"), { status: 503 });
+  }
   const scopeName = showroomId
     ? stats.byShowroom.find((s) => s.id === showroomId)?.name || "Showroom"
     : "All showrooms";

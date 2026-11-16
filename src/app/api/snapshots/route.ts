@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { isAuthed } from "@/lib/auth";
+import { describeDbFailure } from "@/lib/apiError";
 
 // PRD §5.6 / §6.4 — record the official Google review total per showroom
 // to calibrate scan-trends against real review growth.
@@ -15,17 +16,25 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "showroomId and reviewCount required" }, { status: 400 });
   }
 
-  const snapshot = await prisma.reviewSnapshot.create({
-    data: { showroomId, reviewCount, avgRating: avgRating ?? undefined },
-  });
-  return NextResponse.json({ snapshot }, { status: 201 });
+  try {
+    const snapshot = await prisma.reviewSnapshot.create({
+      data: { showroomId, reviewCount, avgRating: avgRating ?? undefined },
+    });
+    return NextResponse.json({ snapshot }, { status: 201 });
+  } catch (err) {
+    return NextResponse.json(describeDbFailure(err, "POST /api/snapshots"), { status: 503 });
+  }
 }
 
 export async function GET() {
   if (!isAuthed()) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  const snapshots = await prisma.reviewSnapshot.findMany({
-    orderBy: { recordedAt: "desc" },
-    take: 50,
-  });
-  return NextResponse.json({ snapshots });
+  try {
+    const snapshots = await prisma.reviewSnapshot.findMany({
+      orderBy: { recordedAt: "desc" },
+      take: 50,
+    });
+    return NextResponse.json({ snapshots });
+  } catch (err) {
+    return NextResponse.json(describeDbFailure(err, "GET /api/snapshots"), { status: 503 });
+  }
 }
